@@ -1,0 +1,16 @@
+.logo_text {
+  font-family: "Pacifico", cursive;
+  font-weight: 400;
+  font-style: normal;
+}
+.input_main {
+  display: flex;
+  flex-direction: column;
+  column-gap: 10px;
+}
+.login_btn {
+  background: #c3a5e4;
+}
+.google_btn {
+  background: #9c7fbd;
+}

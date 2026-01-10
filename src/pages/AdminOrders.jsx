@@ -37,11 +37,22 @@ export default function AdminOrders() {
 
       Object.entries(data).forEach(([uid, userOrders]) => {
         Object.entries(userOrders).forEach(([oid, order]) => {
-          all.push({
-            userId: uid,
-            id: oid,
-            ...order,
-          });
+       all.push({
+  userId: uid,
+  id: oid,
+  orderId: order.orderId || oid,
+
+  // ✅ SHIPPING MAPPING
+  customer_name: order.shipping?.name || "",
+  address: order.shipping?.address || "",
+  city: order.shipping?.city || "",
+  state: order.shipping?.state || "",
+  pincode: order.shipping?.pincode || "",
+  phone: order.shipping?.phone || "",
+
+  ...order,
+});
+
         });
       });
 
@@ -170,8 +181,8 @@ const filteredOrders = useMemo(() => {
       const payload = {
         userId: order.userId,
        orderId: order.orderId || order.id,
-        customer_name: order.customerName,
-        address: order.address,
+        customer_name: order.customer_name,
+        address:order.address,
         city: order.city,
         state: order.state,
         pincode: order.pincode,
@@ -183,8 +194,8 @@ const filteredOrders = useMemo(() => {
       };
 
       const res = await axios.post(`${API}/create-shipment`, payload);
-      const data = res.data.data || {};
-      const awb = data.awb_code || "";
+     const awb = res.data?.awb || "";
+
 
       await update(ref(db, `orders/${order.userId}/${order.id}`), {
         status: "Shipped",
@@ -210,7 +221,7 @@ const filteredOrders = useMemo(() => {
     const html = `
       <h2>Shipping Label</h2>
       <p>Order: ${order.orderId}</p>
-      <p>Name: ${order.customerName}</p>
+      <p>Name: ${order.customer_name}</p>
       <p>Phone: ${order.phone}</p>
       <p>Address: ${order.address}, ${order.city}, ${order.state} - ${
       order.pincode
@@ -352,7 +363,7 @@ const filteredOrders = useMemo(() => {
               </span>
             </div>
 
-            <p className="text-sm">👤 {order.customerName}</p>
+            <p className="text-sm">👤 {order.customer_name}</p>
             <p className="text-sm">📍 {order.address}</p>
             <p className="text-sm">
               Total: <strong>₹{order.total}</strong>

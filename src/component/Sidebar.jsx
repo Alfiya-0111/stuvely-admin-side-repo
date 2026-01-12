@@ -6,7 +6,8 @@ function Sidebar() {
       <h2 className="text-xl font-bold mb-6">Admin Panel</h2>
       <ul className="space-y-4">
         <li><Link to="/admin">Dashboard</Link></li>
-        <li><Link to="/admin/users">Users</Link></li>
+        <li><Link to="/admin/users">NavLiNKs</Link></li>
+        <li><Link to="/admin/imgurl">ImgUrl</Link></li>
         <li><Link to="/admin/ourcollection">OurCollection</Link></li>
            <li><Link to="/admin/offerslider">OfferSlider</Link></li>
             <li><Link to="/admin/bestdeals">Bestdeals</Link></li>

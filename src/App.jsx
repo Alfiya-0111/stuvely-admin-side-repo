@@ -17,6 +17,7 @@ import Keychainsproduts from './pages/Keychainsproduts';
 import AdminFooterEditor from './pages/AdminFooterEditor';
 import AdminOrders from './pages/AdminOrders';
 import AdminReviews from './pages/AdminReviews';
+import ImgUrl from './pages/ImgUrl';
 
 function App() {
  
@@ -33,6 +34,7 @@ function App() {
      <Route path="/admin" element={<Adminlayout />}>
           <Route index element={<Dashboard />} />
           <Route path="users" element={<User />} />
+          <Route path='imgurl' element={<ImgUrl/>}/>
            <Route path='offerslider' element={<OfferSlider/>}/>
           <Route path="ourcollection" element={<AdminCollections />} />
           <Route path = "bestdeals" element= {<BestDealsAdmin/>}/>

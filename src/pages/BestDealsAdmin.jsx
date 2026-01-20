@@ -349,13 +349,20 @@ const slug = offerForm.slug;
         <div key={o.id} className="border p-4 rounded mb-4">
           <div className="flex justify-between items-center mb-2">
             <span className="font-semibold">{o.title}</span>
+       {o.bgImage && (
+  <img
+    src={o.bgImage}
+    alt={o.title}
+    className="h-18 w-20 object-cover rounded mt-2"
+  />
+)}
             <div className="flex gap-2">
               <button className="bg-yellow-400 px-2 py-1 rounded" onClick={() => { setEditingOfferId(o.id); setOfferForm({ title: o.title, slug: o.slug, bgImage: o.bgImage }); }}>Edit</button>
               <button className="bg-red-600 px-2 py-1 rounded text-white" onClick={() => deleteOffer(o.id)}>Delete</button>
             </div>
           </div>
 
-         {Object.entries(o.products).map(([pid, p]) => (
+       {Object.entries(o.products || {}).map(([pid, p]) => (
   <div
     key={pid}
     className="flex justify-between items-center border p-2 rounded mb-2 gap-3"

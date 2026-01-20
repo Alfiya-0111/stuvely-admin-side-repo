@@ -1,4 +1,18 @@
 import React, { useState, useEffect } from "react";
+const IMGBB_API_KEY = "0a20bc1e3b35864b35f589679aa50b0d";
+
+const uploadToImgBB = async (file) => {
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const res = await fetch(
+    `https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`,
+    { method: "POST", body: formData }
+  );
+
+  const data = await res.json();
+  return data.data.url;
+};
 
 export default function Keychainsproduts() {
   const FIREBASE_BASE = "https://stuvely-data-default-rtdb.firebaseio.com";
@@ -172,15 +186,25 @@ export default function Keychainsproduts() {
                 onChange={(e) => setCar({ ...car, price: e.target.value })}
                 className="w-full border p-3 rounded-md"
               />
-              <input
-                placeholder="Main Image URL"
-                value={car.image}
-                onChange={(e) => setCar({ ...car, image: e.target.value })}
-                className="w-full border p-3 rounded-md"
-              />
-              {car.image && (
-                <img src={car.image} alt="Preview" className="w-full h-48 object-cover rounded-md border" />
-              )}
+             <input
+  type="file"
+  accept="image/*"
+  className="w-full border p-3 rounded-md"
+  onChange={async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const url = await uploadToImgBB(file);
+    setCar({ ...car, image: url });
+  }}
+/>
+
+{car.image && (
+  <img
+    src={car.image}
+    alt="Preview"
+    className="w-full h-48 object-cover rounded-md border mt-2"
+  />
+)}
 
               <textarea
                 placeholder="Description"
@@ -195,12 +219,26 @@ export default function Keychainsproduts() {
                 <div className="space-y-2">
                   {car.gallery.map((g, i) => (
                     <div key={i} className="flex gap-2">
-                      <input
-                        placeholder={`Gallery Image ${i + 1}`}
-                        value={g}
-                        onChange={(e) => updateGalleryItem(i, e.target.value)}
-                        className="flex-1 border p-2 rounded-md"
-                      />
+                     <input
+  type="file"
+  accept="image/*"
+  className="flex-1 border p-2 rounded-md"
+  onChange={async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const url = await uploadToImgBB(file);
+    updateGalleryItem(i, url);
+  }}
+/>
+
+{g && (
+  <img
+    src={g}
+    alt={`Gallery ${i}`}
+    className="h-20 w-20 object-cover rounded border"
+  />
+)}
+
                       <button
                         type="button"
                         onClick={() => removeGallery(i)}

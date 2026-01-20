@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import "./App.css";
 
 import Login from "./pages/Login";
@@ -22,21 +22,14 @@ import ImgUrl from "./pages/ImgUrl";
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* ===== PUBLIC ROUTES ===== */}
-        <Route path="/" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
+    <Routes>
+      {/* ===== PUBLIC ROUTES ===== */}
+      <Route path="/" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
 
-        {/* ===== ADMIN ROUTES ===== */}
-        <Route
-          path="/admin"
-          element={
-            <AdminProtectedRoute>
-              <Adminlayout />
-            </AdminProtectedRoute>
-          }
-        >
+      {/* ===== PROTECTED ADMIN WRAPPER ===== */}
+      <Route element={<AdminProtectedRoute />}>
+        <Route path="/admin" element={<Adminlayout />}>
           <Route index element={<Dashboard />} />
           <Route path="users" element={<User />} />
           <Route path="imgurl" element={<ImgUrl />} />
@@ -49,8 +42,8 @@ function App() {
           <Route path="reviews" element={<AdminReviews />} />
           <Route path="adminfooter" element={<AdminFooterEditor />} />
         </Route>
-      </Routes>
-    </BrowserRouter>
+      </Route>
+    </Routes>
   );
 }
 

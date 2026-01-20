@@ -1,11 +1,4 @@
 import React, { useState, useEffect } from "react";
-
-/**
- * Admin - Add / Edit / Delete Car Products
- * Uses Firebase Realtime DB REST API (POST / PATCH / DELETE).
- *
- * Replace FIREBASE_BASE with your project's DB base if different.
- */
 export default function Carproduct() {
   const FIREBASE_BASE = "https://stuvely-data-default-rtdb.firebaseio.com";
   const FIREBASE_URL = `${FIREBASE_BASE}/cars.json`;

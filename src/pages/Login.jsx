@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router-dom";
 import { auth, googleProvider } from "../firebaseConfig";
 import {
   signInWithEmailAndPassword,
@@ -11,7 +11,7 @@ import login_background from "../assets/login_background.jpg";
 
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-
+const ADMIN_EMAIL = "faiz53308@gmail.com";
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,38 +20,54 @@ function Login() {
   const navigate = useNavigate();
 
   // Email Login
-  const handleLogin = async (e) => {
-    e.preventDefault();
+const handleLogin = async (e) => {
+  e.preventDefault();
 
-    try {
-      const res = await signInWithEmailAndPassword(auth, email, password);
-      const user = res.user;
+  // ❌ Email restriction
+  if (email !== ADMIN_EMAIL) {
+    toast.error("Unauthorized admin access");
+    return;
+  }
 
-      localStorage.setItem("uid", user.uid);
-      localStorage.setItem("token", user.accessToken);
+  try {
+    const res = await signInWithEmailAndPassword(auth, email, password);
+    const user = res.user;
 
-      toast.success("Login successful!");
-      navigate("/admin");
-    } catch (err) {
-      toast.error(err.message);
-    }
-  };
+    localStorage.setItem("uid", user.uid);
+    localStorage.setItem("token", user.accessToken);
+    localStorage.setItem("role", "admin");
+
+    toast.success("Admin login successful!");
+    navigate("/admin");
+  } catch (err) {
+    toast.error(err.message);
+  }
+};
+
 
   // Google Login
-  const handleGoogleLogin = async () => {
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
+ const handleGoogleLogin = async () => {
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    const user = result.user;
 
-      localStorage.setItem("uid", user.uid);
-      localStorage.setItem("token", user.accessToken);
-
-      toast.success("Google Login Successful!");
-      navigate("/admin");
-    } catch (err) {
-      toast.error("Google login failed: " + err.message);
+    if (user.email !== ADMIN_EMAIL) {
+      toast.error("Unauthorized Google account");
+      await auth.signOut();
+      return;
     }
-  };
+
+    localStorage.setItem("uid", user.uid);
+    localStorage.setItem("token", user.accessToken);
+    localStorage.setItem("role", "admin");
+
+    toast.success("Admin Google Login Successful!");
+    navigate("/admin");
+  } catch (err) {
+    toast.error(err.message);
+  }
+};
+
 
   // Reset Password
   const handlePasswordReset = async () => {

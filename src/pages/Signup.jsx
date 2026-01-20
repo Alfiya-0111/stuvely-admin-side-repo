@@ -1,37 +1,45 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import { auth } from "../firebaseConfig";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import signup_background from "../assets/login_background.jpg";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-
+const ADMIN_EMAIL = "faiz53308@gmail.com";
 function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
-  const handleSignup = async (e) => {
-    e.preventDefault();
+const handleSignup = async (e) => {
+  e.preventDefault();
 
-    try {
-      const userData = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
+  // ❌ Email restriction
+  if (email !== ADMIN_EMAIL) {
+    toast.error("You are not authorized to create admin account");
+    return;
+  }
 
-      const user = userData.user;
-      localStorage.setItem("uid", user.uid);
-      localStorage.setItem("token", user.accessToken);
+  try {
+    const userData = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
 
-      toast.success("Signup successful!");
-      navigate("/admin");
-    } catch (err) {
-      toast.error(err.message);
-    }
-  };
+    const user = userData.user;
+    localStorage.setItem("uid", user.uid);
+    localStorage.setItem("token", user.accessToken);
+    localStorage.setItem("role", "admin");
+
+    toast.success("Admin signup successful!");
+    navigate("/admin");
+  } catch (err) {
+    toast.error(err.message);
+  }
+};
+
 
   return (
     <section

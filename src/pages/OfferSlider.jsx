@@ -1,8 +1,10 @@
-/*  OfferSlider.jsx  –  with 14 e-com platform links  */
-import React, { useState, useEffect } from "react";
 
+import React, { useState, useEffect } from "react";
+const IMGBB_API_KEY = "0a20bc1e3b35864b35f589679aa50b0d";
 function OfferSlider() {
   const [sliders, setSliders] = useState([]);
+  const [sliderBgFile, setSliderBgFile] = useState(null);
+const [productImageFile, setProductImageFile] = useState(null);
   const [formData, setFormData] = useState({
     title: "",
     subtitle: "",
@@ -10,6 +12,21 @@ function OfferSlider() {
     bgImage: "",
     offerPercent: "",
   });
+  const uploadToImgBB = async (file) => {
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const res = await fetch(
+    `https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`,
+    { method: "POST", body: formData }
+  );
+
+  const data = await res.json();
+  if (!data.success) throw new Error("Image upload failed");
+
+  return data.data.url;
+};
+
   const [editingSliderId, setEditingSliderId] = useState(null);
 
 const [productData, setProductData] = useState({
@@ -69,33 +86,62 @@ const [productData, setProductData] = useState({
   const generateSlug = (name) => name.trim().toLowerCase().replace(/\s+/g, "-");
 
   // ---------- Slider handlers ----------
-  const handleAddSlider = async (e) => {
-    e.preventDefault();
+const handleAddSlider = async (e) => {
+  e.preventDefault();
+
+  try {
+    let bgImageUrl = formData.bgImage;
+
+    if (sliderBgFile) {
+      bgImageUrl = await uploadToImgBB(sliderBgFile);
+    }
+
     const slug = generateSlug(formData.title || "untitled");
-    try {
-      if (editingSliderId) {
-        await fetch(`https://stuvely-data-default-rtdb.firebaseio.com/offersliders/${editingSliderId}.json`, {
+
+    const payload = {
+      ...formData,
+      bgImage: bgImageUrl,
+      slug,
+      products:
+        sliders.find((s) => s.id === editingSliderId)?.products || {},
+    };
+
+    if (editingSliderId) {
+      await fetch(
+        `https://stuvely-data-default-rtdb.firebaseio.com/offersliders/${editingSliderId}.json`,
+        {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...formData, slug, products: sliders.find((s) => s.id === editingSliderId)?.products || {} }),
-        });
-        alert("Slider updated!");
-        setEditingSliderId(null);
-      } else {
-        await fetch("https://stuvely-data-default-rtdb.firebaseio.com/offersliders.json", {
+          body: JSON.stringify(payload),
+        }
+      );
+      setEditingSliderId(null);
+    } else {
+      await fetch(
+        "https://stuvely-data-default-rtdb.firebaseio.com/offersliders.json",
+        {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...formData, slug, products: {} }),
-        });
-        alert("Slider added!");
-      }
-      setFormData({ title: "", subtitle: "", bgColor: "", bgImage: "", offerPercent: "" });
-      fetchSliders();
-    } catch (err) {
-      console.error("handleAddSlider error:", err);
-      alert("Failed to save slider.");
+          body: JSON.stringify(payload),
+        }
+      );
     }
-  };
+
+    setFormData({
+      title: "",
+      subtitle: "",
+      bgColor: "",
+      bgImage: "",
+      offerPercent: "",
+    });
+    setSliderBgFile(null);
+    fetchSliders();
+  } catch (err) {
+    console.error(err);
+    alert("Slider save failed");
+  }
+};
+
 
   const handleEditSlider = (slider) => {
     setFormData({
@@ -121,95 +167,91 @@ const [productData, setProductData] = useState({
   };
 
   // ---------- Product handlers ----------
-  const handleAddProduct = async (e) => {
-    e.preventDefault();
-    if (!productData.sliderId) return alert("Select a slider");
+ const handleAddProduct = async (e) => {
+  e.preventDefault();
 
-    const galleryNormalized = (productData.gallery || []).map((g) =>
-      typeof g === "string" ? { type: "image", url: g } : g
+  if (!productData.sliderId) {
+    alert("Select a slider");
+    return;
+  }
+
+  try {
+    // ---------- MAIN IMAGE ----------
+    let imageUrl = productData.imageUrl;
+    if (productImageFile) {
+      imageUrl = await uploadToImgBB(productImageFile);
+    }
+
+    // ---------- GALLERY NORMALIZE ----------
+    const galleryNormalized = await Promise.all(
+      (productData.gallery || []).map(async (g) => {
+        if (g.type === "image" && g.file) {
+          const url = await uploadToImgBB(g.file);
+          return { type: "image", url };
+        }
+        return g;
+      })
     );
 
-    const prodBody = {
+    const productBody = {
       name: productData.name,
-      imageUrl: productData.imageUrl || "",
+      imageUrl,
       videoUrl: productData.videoUrl || "",
       price: productData.price,
-      offer: productData.offer || null,
-      description: productData.description,
-       highlights: productData.highlights || [],
-  specs: productData.specs || {},
+      offer: productData.offer || "",
+      description: productData.description || "",
+      highlights: productData.highlights || [],
+      specs: productData.specs || {},
       variants: productData.variants || [],
       gallery: galleryNormalized,
-      flipkart: productData.flipkart.trim(), // ✅
-      amazon: productData.amazon.trim(),     // ✅
-      shopify: productData.shopify.trim(),   // ✅
-      ajio: productData.ajio.trim(),         // ✅
-      myntra: productData.myntra.trim(),     // ✅
-      tatacliq: productData.tatacliq.trim(), // ✅
-      nykaa: productData.nykaa.trim(),       // ✅
-      meesho: productData.meesho.trim(),     // ✅
-      snapdeal: productData.snapdeal.trim(), // ✅
-      paytmmall: productData.paytmmall.trim(), // ✅
-      firstcry: productData.firstcry.trim(), // ✅
+
+      flipkart: productData.flipkart || "",
+      amazon: productData.amazon || "",
+      shopify: productData.shopify || "",
+      ajio: productData.ajio || "",
+      myntra: productData.myntra || "",
+      tatacliq: productData.tatacliq || "",
+      nykaa: productData.nykaa || "",
+      meesho: productData.meesho || "",
+      snapdeal: productData.snapdeal || "",
+      paytmmall: productData.paytmmall || "",
+      firstcry: productData.firstcry || "",
     };
 
-    try {
-      if (editingProductId) {
-        await fetch(`https://stuvely-data-default-rtdb.firebaseio.com/offersliders/${productData.sliderId}/products/${editingProductId}.json`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(prodBody),
-        });
-        alert("Product updated!");
-        setEditingProductId(null);
-      } else {
-        await fetch(`https://stuvely-data-default-rtdb.firebaseio.com/offersliders/${productData.sliderId}/products.json`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(prodBody),
-        });
-        alert("Product added!");
-      }
-     setProductData({
-  sliderId: "",
-  name: "",
-  imageUrl: "",
-  videoUrl: "",
-  price: "",
-  offer: "",
-  description: "",
+    const url = editingProductId
+      ? `https://stuvely-data-default-rtdb.firebaseio.com/offersliders/${productData.sliderId}/products/${editingProductId}.json`
+      : `https://stuvely-data-default-rtdb.firebaseio.com/offersliders/${productData.sliderId}/products.json`;
 
-  highlights: [""],
-  specs: {
-    color: "",
-    size: "",
-    dimensions: "",
-    weight: "",
-  },
+    await fetch(url, {
+      method: editingProductId ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(productBody),
+    });
 
-  variants: [],
-  gallery: [],
+    alert(editingProductId ? "Product Updated" : "Product Added");
 
-  flipkart: "",
-  amazon: "",
-  shopify: "",
-  ajio: "",
-  myntra: "",
-  tatacliq: "",
-  nykaa: "",
-  meesho: "",
-  snapdeal: "",
-  paytmmall: "",
-  firstcry: "",
-});
-
-      fetchSliders();
-    } catch (err) {
-      console.error("handleAddProduct error:", err);
-      alert("Failed to save product.");
-    }
-  };
-
+    // RESET
+    setProductData({
+      sliderId: "",
+      name: "",
+      imageUrl: "",
+      videoUrl: "",
+      price: "",
+      offer: "",
+      description: "",
+      highlights: [""],
+      specs: { color: "", size: "", dimensions: "", weight: "" },
+      variants: [],
+      gallery: [],
+    });
+    setProductImageFile(null);
+    setEditingProductId(null);
+    fetchSliders();
+  } catch (err) {
+    console.error(err);
+    alert("Product save failed");
+  }
+};
 const handleEditProduct = (sliderId, prodId, prod) => {
   const galleryNormalized = (prod.gallery || []).map((g) =>
     typeof g === "string" ? { type: "image", url: g } : g
@@ -331,7 +373,20 @@ const updateSpec = (key, value) => {
         <input required placeholder="Title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} className="border p-2 rounded" />
         <input placeholder="Subtitle" value={formData.subtitle} onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })} className="border p-2 rounded" />
         <input placeholder="Background Color" value={formData.bgColor} onChange={(e) => setFormData({ ...formData, bgColor: e.target.value })} className="border p-2 rounded" />
-        <input placeholder="Background Image URL" value={formData.bgImage} onChange={(e) => setFormData({ ...formData, bgImage: e.target.value })} className="border p-2 rounded" />
+       <input
+  type="file"
+  accept="image/*"
+  onChange={(e) => setSliderBgFile(e.target.files[0])}
+  className="border p-2 rounded"
+/>
+
+{formData.bgImage && (
+  <img
+    src={formData.bgImage}
+    className="w-24 h-16 object-cover rounded"
+  />
+)}
+
         <input placeholder="Offer %" type="number" value={formData.offerPercent} onChange={(e) => setFormData({ ...formData, offerPercent: e.target.value })} className="border p-2 rounded" />
         <button className="bg-violet-600 text-white p-2 rounded">{editingSliderId ? "Update Slider" : "Add Slider"}</button>
       </form>
@@ -348,7 +403,20 @@ const updateSpec = (key, value) => {
 
         <input required placeholder="Product Name" value={productData.name} onChange={(e) => setProductData({ ...productData, name: e.target.value })} className="border p-2 rounded" />
 
-        <input placeholder="Product Image URL (main)" value={productData.imageUrl} onChange={(e) => setProductData({ ...productData, imageUrl: e.target.value })} className="border p-2 rounded" />
+      <input
+  type="file"
+  accept="image/*"
+  onChange={(e) => setProductImageFile(e.target.files[0])}
+  className="border p-2 rounded"
+/>
+
+{productData.imageUrl && (
+  <img
+    src={productData.imageUrl}
+    className="w-20 h-20 object-cover rounded"
+  />
+)}
+
 
         <input placeholder="Product Video URL (main, optional)" value={productData.videoUrl} onChange={(e) => setProductData({ ...productData, videoUrl: e.target.value })} className="border p-2 rounded" />
 
@@ -428,7 +496,19 @@ const updateSpec = (key, value) => {
                 <option value="image">Image</option>
                 <option value="video">Video</option>
               </select>
-              <input className="flex-1 border p-1 rounded" placeholder={`Enter ${item.type} URL`} value={item.url} onChange={(e) => updateGalleryItem(i, "url", e.target.value)} />
+            <input
+  type="file"
+  accept="image/*"
+  onChange={(e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const newGallery = [...productData.gallery];
+    newGallery[i] = { type: "image", file };
+    setProductData({ ...productData, gallery: newGallery });
+  }}
+/>
+
               {item.type === "image" && item.url && <img src={item.url} alt={`preview-${i}`} className="w-16 h-16 object-cover rounded" />}
               {item.type === "video" && item.url && <video src={item.url} className="w-24 h-16 object-cover rounded" controls />}
               <button type="button" onClick={() => removeGalleryItem(i)} className="px-2 py-1 bg-red-400 text-white rounded">Remove</button>

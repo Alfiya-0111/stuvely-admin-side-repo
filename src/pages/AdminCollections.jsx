@@ -1,10 +1,29 @@
 import React, { useEffect, useState } from "react";
 
 const BASE_URL = "https://stuvely-data-default-rtdb.firebaseio.com";
+const IMGBB_API_KEY = "0a20bc1e3b35864b35f589679aa50b0d";
+
+const uploadToImgBB = async (file) => {
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const res = await fetch(
+    `https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+
+  const data = await res.json();
+  return data.data.url; // final image URL
+};
+
 
 export default function AdminCollections() {
   const [collections, setCollections] = useState([]);
   const [editingCollectionId, setEditingCollectionId] = useState(null);
+const [collectionImageFile, setCollectionImageFile] = useState(null);
 
   const [collectionForm, setCollectionForm] = useState({
     name: "",
@@ -60,35 +79,56 @@ export default function AdminCollections() {
 
   const slugify = (text) =>
     text.trim().toLowerCase().replace(/\s+/g, "-");
+//collection edit function 
+const editCollection = (col) => {
+  setEditingCollectionId(col.id);
+  setCollectionForm({
+    name: col.name,
+    imageUrl: col.imageUrl, // purani image
+  });
+  setCollectionImageFile(null);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+};
 
   /* ---------------- COLLECTION CRUD ---------------- */
-  const handleCollectionSubmit = async (e) => {
-    e.preventDefault();
+ const handleCollectionSubmit = async (e) => {
+  e.preventDefault();
 
-    const payload = {
-      ...collectionForm,
-      slug: slugify(collectionForm.name),
-      products:
-        editingCollectionId
-          ? collections.find((c) => c.id === editingCollectionId)?.products || {}
-          : {},
-    };
+  let imageUrl = collectionForm.imageUrl;
 
-    const url = editingCollectionId
-      ? `${BASE_URL}/ourcollections/${editingCollectionId}.json`
-      : `${BASE_URL}/ourcollections.json`;
+  // sirf tab upload jab new image ho
+  if (collectionImageFile) {
+    imageUrl = await uploadToImgBB(collectionImageFile);
+  }
 
-    await fetch(url, {
-      method: editingCollectionId ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    alert(editingCollectionId ? "Collection Updated" : "Collection Added");
-    setCollectionForm({ name: "", imageUrl: "" });
-    setEditingCollectionId(null);
-    fetchCollections();
+  const payload = {
+    name: collectionForm.name,
+    imageUrl,
+    slug: slugify(collectionForm.name),
+    products:
+      editingCollectionId
+        ? collections.find((c) => c.id === editingCollectionId)?.products || {}
+        : {},
   };
+
+  const url = editingCollectionId
+    ? `${BASE_URL}/ourcollections/${editingCollectionId}.json`
+    : `${BASE_URL}/ourcollections.json`;
+
+  await fetch(url, {
+    method: editingCollectionId ? "PUT" : "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  alert(editingCollectionId ? "Collection Updated" : "Collection Added");
+
+  setCollectionForm({ name: "", imageUrl: "" });
+  setCollectionImageFile(null);
+  setEditingCollectionId(null);
+  fetchCollections();
+};
+
 
   const deleteCollection = async (id) => {
     if (!window.confirm("Delete collection?")) return;
@@ -212,18 +252,20 @@ const removeGalleryImage = (index) => {
             }
             required
           />
-          <input
-            className="border p-2 rounded"
-            placeholder="Collection Image URL"
-            value={collectionForm.imageUrl}
-            onChange={(e) =>
-              setCollectionForm({
-                ...collectionForm,
-                imageUrl: e.target.value,
-              })
-            }
-            required
-          />
+        <input
+  type="file"
+  accept="image/*"
+  className="border p-2 rounded"
+  onChange={(e) => setCollectionImageFile(e.target.files[0])}
+/>
+
+{collectionForm.imageUrl && (
+  <img
+    src={collectionForm.imageUrl}
+    className="w-20 h-20 object-cover rounded border"
+  />
+)}
+
           <button className="bg-blue-600 text-white px-4 py-2 rounded w-max">
             {editingCollectionId ? "Update" : "Add"}
           </button>
@@ -286,14 +328,19 @@ const removeGalleryImage = (index) => {
             required
           />
 
-          <input
-            className="border p-2 rounded"
-            placeholder="Main Image URL"
-            value={productData.image}
-            onChange={(e) =>
-              setProductData({ ...productData, image: e.target.value })
-            }
-          />
+        <input
+  type="file"
+  accept="image/*"
+  className="border p-2 rounded"
+  onChange={async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const url = await uploadToImgBB(file);
+    setProductData({ ...productData, image: url });
+  }}
+/>
+
           {/* ---------- GALLERY IMAGES ---------- */}
 <div>
   <label className="block font-medium mb-2">
@@ -304,11 +351,18 @@ const removeGalleryImage = (index) => {
     {productData.gallery.map((img, i) => (
       <div key={i} className="flex gap-2 items-center">
         <input
-          className="flex-1 border p-2 rounded"
-          placeholder={`Gallery Image ${i + 1} URL`}
-          value={img}
-          onChange={(e) => updateGallery(i, e.target.value)}
-        />
+  type="file"
+  accept="image/*"
+  className="flex-1 border p-2 rounded"
+  onChange={async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const url = await uploadToImgBB(file);
+    updateGallery(i, url);
+  }}
+/>
+
 
         {img && (
           <img
@@ -433,12 +487,22 @@ const removeGalleryImage = (index) => {
     <h3 className="font-semibold text-lg">{col.name}</h3>
   </div>
 
+ <div className="flex gap-3">
+  <button
+    className="text-blue-600 text-sm"
+    onClick={() => editCollection(col)}
+  >
+    Edit
+  </button>
+
   <button
     className="text-red-600 text-sm"
     onClick={() => deleteCollection(col.id)}
   >
     Delete
   </button>
+</div>
+
 </div>
 
       {col.products &&

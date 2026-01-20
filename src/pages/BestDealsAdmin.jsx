@@ -1,7 +1,22 @@
 import React, { useState, useEffect } from "react";
 
 const FIREBASE_DB_URL = "https://stuvely-data-default-rtdb.firebaseio.com/bestdeals.json";
+const IMGBB_API_KEY = "0a20bc1e3b35864b35f589679aa50b0d";
+const uploadToImgBB = async (file) => {
+  const formData = new FormData();
+  formData.append("image", file);
 
+  const res = await fetch(
+    `https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+
+  const data = await res.json();
+  return data.data.url;
+};
 export default function BestDealsAdmin() {
   const [offers, setOffers] = useState([]);
   const [editingOfferId, setEditingOfferId] = useState(null);
@@ -40,12 +55,18 @@ export default function BestDealsAdmin() {
     }
   };
 
-  const generateSlug = (name) => name.trim().toLowerCase().replace(/\s+/g, "-");
+ const generateSlug = (text) =>
+  text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "") // special chars remove
+    .replace(/\s+/g, "-");    // space → dash
+
 
   // ===== Offer Handlers =====
   const saveOffer = async () => {
     if (!offerForm.title || !offerForm.slug) return alert("Title & Slug required!");
-    const slug = generateSlug(offerForm.slug);
+const slug = offerForm.slug;
 
     try {
       if (editingOfferId) {
@@ -152,9 +173,46 @@ export default function BestDealsAdmin() {
       {/* ===== Offer Form ===== */}
       <div className="border p-4 rounded mb-6">
         <h2 className="text-xl font-semibold mb-2">{editingOfferId ? "Edit Offer" : "Add Offer"}</h2>
-        <input placeholder="Title" className="border p-2 mb-2 w-full" value={offerForm.title} onChange={e => setOfferForm({ ...offerForm, title: e.target.value })} />
-        <input placeholder="Slug" className="border p-2 mb-2 w-full" value={offerForm.slug} onChange={e => setOfferForm({ ...offerForm, slug: e.target.value })} />
-        <input placeholder="Background Image URL" className="border p-2 mb-2 w-full" value={offerForm.bgImage} onChange={e => setOfferForm({ ...offerForm, bgImage: e.target.value })} />
+       <input
+  placeholder="Title"
+  className="border p-2 mb-2 w-full"
+  value={offerForm.title}
+  onChange={(e) => {
+    const title = e.target.value;
+    setOfferForm({
+      ...offerForm,
+      title,
+      slug: generateSlug(title), // 👈 auto slug
+    });
+  }}
+/>
+
+        <input
+  placeholder="Slug (auto-generated)"
+  className="border p-2 mb-2 w-full bg-gray-100 text-gray-600"
+  value={offerForm.slug}
+  readOnly
+/>
+       <input
+  type="file"
+  accept="image/*"
+  className="border p-2 mb-2 w-full"
+  onChange={async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const url = await uploadToImgBB(file);
+    setOfferForm({ ...offerForm, bgImage: url });
+  }}
+/>
+
+{offerForm.bgImage && (
+  <img
+    src={offerForm.bgImage}
+    alt="Background Preview"
+    className="h-28 w-full object-cover rounded mt-2"
+  />
+)}
+
         <button className="px-4 py-2 bg-blue-600 text-white rounded" onClick={saveOffer}>{editingOfferId ? "Update Offer" : "Add Offer"}</button>
       </div>
 
@@ -170,7 +228,22 @@ export default function BestDealsAdmin() {
         <input placeholder="Name" className="border p-2 mb-2 w-full" value={productForm.name} onChange={e => setProductForm({ ...productForm, name: e.target.value })} />
         <input placeholder="Price" type="number" className="border p-2 mb-2 w-full" value={productForm.price} onChange={e => setProductForm({ ...productForm, price: e.target.value })} />
         <input placeholder="Offer (%)" type="number" className="border p-2 mb-2 w-full" value={productForm.offer} onChange={e => setProductForm({ ...productForm, offer: e.target.value })} />
-        <input placeholder="Main Image URL" className="border p-2 mb-2 w-full" value={productForm.imageUrl} onChange={e => setProductForm({ ...productForm, imageUrl: e.target.value })} />
+       <input
+  type="file"
+  accept="image/*"
+  className="border p-2 mb-2 w-full"
+  onChange={async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const url = await uploadToImgBB(file);
+    setProductForm({ ...productForm, imageUrl: url });
+  }}
+/>
+
+{productForm.imageUrl && (
+  <img src={productForm.imageUrl} className="h-20 mt-2 rounded" />
+)}
+
         <input placeholder="Description" className="border p-2 mb-2 w-full" value={productForm.description} onChange={e => setProductForm({ ...productForm, description: e.target.value })} />
       
       
@@ -241,7 +314,27 @@ export default function BestDealsAdmin() {
                 <option value="image">Image</option>
                 <option value="video">Video</option>
               </select>
-              <input placeholder="URL" className="border p-1 flex-1" value={g.url} onChange={e => updateGalleryItem(i, "url", e.target.value)} />
+            {g.type === "image" ? (
+  <input
+    type="file"
+    accept="image/*"
+    className="border p-1 flex-1"
+    onChange={async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const url = await uploadToImgBB(file);
+      updateGalleryItem(i, "url", url);
+    }}
+  />
+) : (
+  <input
+    placeholder="Video URL"
+    className="border p-1 flex-1"
+    value={g.url}
+    onChange={e => updateGalleryItem(i, "url", e.target.value)}
+  />
+)}
+
               <button type="button" className="bg-red-400 text-white px-2 py-1 rounded" onClick={() => removeGalleryItem(i)}>Remove</button>
             </div>
           ))}
@@ -262,26 +355,57 @@ export default function BestDealsAdmin() {
             </div>
           </div>
 
-          {o.products && Object.entries(o.products).map(([pid, p]) => (
-            <div key={pid} className="flex justify-between items-center border p-2 rounded mb-1">
-              <div>
-                <span>{p.name} - ₹{p.price} {p.offer ? `(${p.offer}%)` : ""}</span>
+         {Object.entries(o.products).map(([pid, p]) => (
+  <div
+    key={pid}
+    className="flex justify-between items-center border p-2 rounded mb-2 gap-3"
+  >
+    {/* LEFT: Image */}
+    {p.imageUrl && (
+      <img
+        src={p.imageUrl}
+        alt={p.name}
+        className="h-16 w-16 object-cover rounded border"
+      />
+    )}
 
-                {/* external links */}
-                <div className="flex gap-2 mt-1">
-                  {p.flipkart && <a href={p.flipkart} target="_blank" rel="noreferrer" className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Flipkart</a>}
-                  {p.amazon && <a href={p.amazon} target="_blank" rel="noreferrer" className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">Amazon</a>}
-                  {p.shopify && <a href={p.shopify} target="_blank" rel="noreferrer" className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Shopify</a>}
-                  {p.ajio && <a href={p.ajio} target="_blank" rel="noreferrer" className="text-xs bg-pink-100 text-pink-700 px-2 py-0.5 rounded">Ajio</a>}
-                </div>
-              </div>
+    {/* CENTER: Details */}
+    <div className="flex-1">
+      <p className="font-semibold">
+        {p.name} – ₹{p.price}{" "}
+        {p.offer ? <span className="text-green-600">({p.offer}%)</span> : ""}
+      </p>
 
-              <div className="flex gap-2">
-                <button className="bg-yellow-400 px-2 py-1 rounded" onClick={() => { setEditingProductId(pid); setProductForm({ ...p, offerId: o.id }); }}>Edit</button>
-                <button className="bg-red-600 px-2 py-1 rounded text-white" onClick={() => deleteProduct(o.id, pid)}>Delete</button>
-              </div>
-            </div>
-          ))}
+      {/* External links */}
+      <div className="flex gap-2 mt-1 flex-wrap">
+        {p.flipkart && <a href={p.flipkart} target="_blank" className="text-xs bg-blue-100 px-2 py-0.5 rounded">Flipkart</a>}
+        {p.amazon && <a href={p.amazon} target="_blank" className="text-xs bg-orange-100 px-2 py-0.5 rounded">Amazon</a>}
+        {p.shopify && <a href={p.shopify} target="_blank" className="text-xs bg-green-100 px-2 py-0.5 rounded">Shopify</a>}
+        {p.ajio && <a href={p.ajio} target="_blank" className="text-xs bg-pink-100 px-2 py-0.5 rounded">Ajio</a>}
+      </div>
+    </div>
+
+    {/* RIGHT: Actions */}
+    <div className="flex gap-2">
+      <button
+        className="bg-yellow-400 px-2 py-1 rounded"
+        onClick={() => {
+          setEditingProductId(pid);
+          setProductForm({ ...p, offerId: o.id });
+        }}
+      >
+        Edit
+      </button>
+      <button
+        className="bg-red-600 px-2 py-1 rounded text-white"
+        onClick={() => deleteProduct(o.id, pid)}
+      >
+        Delete
+      </button>
+    </div>
+  </div>
+))}
+
         </div>
       ))}
     </div>

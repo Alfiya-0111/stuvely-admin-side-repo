@@ -40,8 +40,28 @@ const handleLogin = async (e) => {
     toast.success("Admin login successful!");
     navigate("/admin");
   } catch (err) {
+  console.log(err.code, err.message);
+
+  if (err.code === "auth/user-not-found") {
+    toast.error("User not found");
+  } 
+  else if (
+    err.code === "auth/wrong-password" ||
+    err.code === "auth/invalid-credential" ||
+    err.code === "auth/invalid-login-credentials"
+  ) {
+    toast.error("Invalid email or password");
+  } 
+  else if (err.code === "auth/invalid-email") {
+    toast.error("Invalid email format");
+  } 
+  else if (err.code === "auth/too-many-requests") {
+    toast.error("Too many attempts. Try later.");
+  } 
+  else {
     toast.error(err.message);
   }
+}
 };
 
 
@@ -113,7 +133,7 @@ const handleLogin = async (e) => {
 
                 <span
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-2 cursor-pointer text-white"
+                  className="absolute right-3 top-2 cursor-pointer text-black"
                 >
                   {showPassword ? "Hide" : "Show"}
                 </span>

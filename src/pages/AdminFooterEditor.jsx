@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../firebaseConfig";
 import { ref, onValue, set } from "firebase/database";
+import { update } from "firebase/database";
 
 export default function AdminFooterEditor() {
   const [footerData, setFooterData] = useState({
@@ -108,11 +109,17 @@ export default function AdminFooterEditor() {
   };
 
   // 🔹 Save Page Changes
-  const savePageChanges = (slug) => {
-    const updated = { ...pagesData };
-    updatePagesDB(updated);
-    setEditingPage(null);
-  };
+
+const savePageChanges = (slug) => {
+  const page = pagesData[slug];
+
+  update(ref(db, `pages/${slug}`), {
+    title: page.title,
+    content: page.content,
+  });
+
+  setEditingPage(null);
+};
 
   // 🔹 Add New Page
   const saveNewPage = () => {

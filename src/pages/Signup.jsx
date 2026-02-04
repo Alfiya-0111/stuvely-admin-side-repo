@@ -5,7 +5,7 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import signup_background from "../assets/login_background.jpg";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-const ADMIN_EMAIL = "faiz53308@gmail.com";
+// const ADMIN_EMAIL = "faiz53308@gmail.com";
 function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -16,10 +16,10 @@ const handleSignup = async (e) => {
   e.preventDefault();
 
   // ❌ Email restriction
-  if (email !== ADMIN_EMAIL) {
-    toast.error("You are not authorized to create admin account");
-    return;
-  }
+  // if (email !== ADMIN_EMAIL) {
+  //   toast.error("You are not authorized to create admin account");
+  //   return;
+  // }
 
   try {
     const userData = await createUserWithEmailAndPassword(

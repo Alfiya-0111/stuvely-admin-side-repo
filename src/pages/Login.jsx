@@ -11,7 +11,7 @@ import login_background from "../assets/login_background.jpg";
 
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-const ADMIN_EMAIL = "faiz53308@gmail.com";
+// const ADMIN_EMAIL = "faiz53308@gmail.com";
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,11 +23,11 @@ function Login() {
 const handleLogin = async (e) => {
   e.preventDefault();
 
-  // ❌ Email restriction
-  if (email !== ADMIN_EMAIL) {
-    toast.error("Unauthorized admin access");
-    return;
-  }
+  // // ❌ Email restriction
+  // if (email !== ADMIN_EMAIL) {
+  //   toast.error("Unauthorized admin access");
+  //   return;
+  // }
 
   try {
     const res = await signInWithEmailAndPassword(auth, email, password);
@@ -90,18 +90,32 @@ const handleLogin = async (e) => {
 
 
   // Reset Password
-  const handlePasswordReset = async () => {
-    if (!email) {
-      toast.warn("Enter your email first.");
-      return;
-    }
-    try {
-      await sendPasswordResetEmail(auth, email);
-      toast.success("Password reset link sent.");
-    } catch (err) {
+ const handlePasswordReset = async () => {
+  if (!email) {
+    toast.warn("Enter your email first");
+    return;
+  }
+
+  if (email !== ADMIN_EMAIL) {
+    toast.error("Password reset allowed only for admin email");
+    return;
+  }
+
+  try {
+    await sendPasswordResetEmail(auth, email.trim());
+    toast.success("Password reset link sent. Check inbox/spam.");
+  } catch (err) {
+    console.log(err.code);
+
+    if (err.code === "auth/user-not-found") {
+      toast.error("Email not registered");
+    } else if (err.code === "auth/invalid-email") {
+      toast.error("Invalid email format");
+    } else {
       toast.error(err.message);
     }
-  };
+  }
+};
 
   return (
     <section

@@ -96,10 +96,10 @@ const handleLogin = async (e) => {
     return;
   }
 
-  if (email !== ADMIN_EMAIL) {
-    toast.error("Password reset allowed only for admin email");
-    return;
-  }
+  // if (email !== ADMIN_EMAIL) {
+  //   toast.error("Password reset allowed only for admin email");
+  //   return;
+  // }
 
   try {
     await sendPasswordResetEmail(auth, email.trim());

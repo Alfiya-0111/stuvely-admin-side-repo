@@ -36,8 +36,8 @@ function App() {
           <Route path="offerslider" element={<OfferSlider />} />
           <Route path="ourcollection" element={<AdminCollections />} />
           <Route path="bestdeals" element={<BestDealsAdmin />} />
-          <Route path="cars" element={<Carproduct />} />
-          <Route path="keychains" element={<Keychainsproduts />} />
+          <Route path="newarravials" element={<Carproduct />} />
+          {/* <Route path="topdeals" element={<Keychainsproduts />} /> */}
           <Route path="order" element={<AdminOrders />} />
           <Route path="reviews" element={<AdminReviews />} />
           <Route path="adminfooter" element={<AdminFooterEditor />} />

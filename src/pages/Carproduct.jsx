@@ -93,7 +93,7 @@ export default function Carproduct() {
         body: JSON.stringify(car),
       });
 
-      alert(editId ? "🚗 Car Updated!" : "✅ Car Added!");
+      alert(editId ? "New Arravials updated!" : "New Arravials Added!");
       resetForm();
       fetchCars();
     } catch (err) {
@@ -162,7 +162,7 @@ export default function Carproduct() {
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="max-w-5xl mx-auto">
-        <h1 className="text-3xl font-bold text-center text-blue-700 mb-6">Manage Cars 🚘</h1>
+        <h1 className="text-3xl font-bold text-center text-blue-700 mb-6">New Arrivals</h1>
 
         <div className="flex justify-between items-center mb-4">
           {!showForm && (

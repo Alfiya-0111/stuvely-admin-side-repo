@@ -11,8 +11,8 @@ function Sidebar() {
         <li><Link to="/admin/ourcollection">OurCollection</Link></li>
            <li><Link to="/admin/offerslider">OfferSlider</Link></li>
             <li><Link to="/admin/bestdeals">Bestdeals</Link></li>
-            <li><Link to="/admin/cars">Cars</Link></li>
-             <li><Link to="/admin/keychains">Keychains</Link></li>
+            <li><Link to="/admin/newarravials">New Arrvials</Link></li>
+             {/* <li><Link to="/admin/newarravials">New Arrvials</Link></li> */}
                  <li><Link to="/admin/order">Order</Link></li>
                 <li><Link to="/admin/reviews">Reviews</Link></li> 
                <li><Link to="/admin/adminfooter">Footerediting</Link></li>

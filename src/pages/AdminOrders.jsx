@@ -16,6 +16,7 @@ export default function AdminOrders() {
   const [filter, setFilter] = useState("All");
   const [query, setQuery] = useState("");
   const [loadingId, setLoadingId] = useState(null);
+  const [returnRequests, setReturnRequests] = useState([]);
 
   // Date Filters
   const [dateFilter, setDateFilter] = useState("All");
@@ -59,6 +60,21 @@ export default function AdminOrders() {
       setOrders(all.reverse());
     });
   }, []);
+useEffect(() => {
+  const rRef = ref(db, "returnRequests");
+  return onValue(rRef, (snap) => {
+    if (!snap.exists()) return setReturnRequests([]);
+
+    const all = [];
+    Object.entries(snap.val()).forEach(([uid, orders]) => {
+      Object.entries(orders).forEach(([oid, req]) => {
+        all.push({ userId: uid, orderId: oid, req });
+      });
+    });
+
+    setReturnRequests(all.reverse());
+  });
+}, []);
 
   // -------------------------------------------------------
   // Load Cancel Requests
@@ -140,6 +156,27 @@ export default function AdminOrders() {
   return true;
 };
 
+const handleApproveReturn = async (userId, oid) => {
+  await update(ref(db, `orders/${userId}/${oid}`), {
+    returnStatus: "Approved",
+  });
+
+  await update(ref(db, `returnRequests/${userId}/${oid}`), {
+    status: "Approved",
+  });
+
+  alert("Return Approved");
+};
+const handleRejectReturn = async (userId, oid) => {
+  await update(ref(db, `orders/${userId}/${oid}`), {
+    returnRequested: false,
+    returnStatus: "Rejected",
+  });
+
+  await remove(ref(db, `returnRequests/${userId}/${oid}`));
+
+  alert("Return Rejected");
+};
 
   // -------------------------------------------------------
   // Combined Search + Filters
@@ -156,6 +193,9 @@ const filteredOrders = useMemo(() => {
         // Active = NEW + CONFIRMED (not shipped)
         return ["Pending", "Confirmed", "Processing"].includes(o.status);
       }
+if (filter === "Return Requested") {
+  return o.returnStatus === "Requested";
+}
 
       return o.status === filter;
     })
@@ -284,7 +324,7 @@ const filteredOrders = useMemo(() => {
 
         {/* STATUS FILTERS */}
         <div className="flex gap-2">
-          {["All", "Active", "Shipped", "Out For Delivery", "Delivered", "Cancelled"].map((f) => (
+          {["All", "Active", "Shipped", "Out For Delivery", "Delivered","Return Requested","Returned","Cancelled"].map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -448,6 +488,34 @@ const filteredOrders = useMemo(() => {
           </div>
         ))}
       </div>
+
+      <h2 className="text-xl font-semibold mt-10 mb-3">Return Requests</h2>
+
+{returnRequests.map(({ userId, orderId, req }) => (
+  <div key={orderId} className="p-4 border bg-white rounded-lg shadow flex justify-between">
+    <div>
+      <p className="font-semibold">Order: {orderId}</p>
+      <p className="text-sm text-gray-600">Reason: {req.reason}</p>
+    </div>
+
+    <div className="flex gap-2">
+      <button
+        onClick={() => handleApproveReturn(userId, orderId)}
+        className="bg-green-600 text-white px-3 py-1 rounded-lg"
+      >
+        Approve
+      </button>
+
+      <button
+        onClick={() => handleRejectReturn(userId, orderId)}
+        className="border px-3 py-1 rounded-lg"
+      >
+        Reject
+      </button>
+    </div>
+  </div>
+))}
+
     </div>
   );
 }

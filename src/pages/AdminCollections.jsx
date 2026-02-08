@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-
+import { useRef } from "react";
 const BASE_URL = "https://stuvely-data-default-rtdb.firebaseio.com";
 const IMGBB_API_KEY = "0a20bc1e3b35864b35f589679aa50b0d";
 
@@ -21,21 +21,34 @@ const uploadToImgBB = async (file) => {
 
 
 export default function AdminCollections() {
+    const collectionFormRef = useRef(null);
+  const productFormRef = useRef(null);
+  const [offers, setOffers] = useState([]);
   const [collections, setCollections] = useState([]);
   const [editingCollectionId, setEditingCollectionId] = useState(null);
 const [collectionImageFile, setCollectionImageFile] = useState(null);
 
-  const [collectionForm, setCollectionForm] = useState({
-    name: "",
-    imageUrl: "",
-  });
+const [collectionForm, setCollectionForm] = useState({
+  name: "",
+  imageUrl: "",
 
+  // OFFER SLIDER
+  showInOffer: false,
+  offerTitle: "",
+  offerSubtitle: "",
+  offerBgColor: "",
+  offerPercent: "",
+  offerImage: "",
+});
+const [offerImageFile, setOfferImageFile] = useState(null);
   /* ---------------- PRODUCT STATE (SAME AS CARPRODUCT) ---------------- */
   const emptyProduct = {
     collectionId: "",
+      offerId: "", 
     name: "",
     shortDescription: "",
     price: "",
+      stock: "", 
     image: "",
     gallery: [""],
     highlights: [""],
@@ -52,12 +65,30 @@ const [collectionImageFile, setCollectionImageFile] = useState(null);
       shopify: "",
       ajio: "",
     },
+     showInOffer: false,
+     
+      offerPercent: "",
+     
   };
 
   const [productData, setProductData] = useState(emptyProduct);
   const [editingProductId, setEditingProductId] = useState(null);
 
   /* ---------------- FETCH COLLECTIONS ---------------- */
+  const fetchOffers = async () => {
+  const res = await fetch(`${BASE_URL}/offersliders.json`);
+  const data = await res.json();
+
+  if (data) {
+    const arr = Object.keys(data).map(id => ({
+      id,
+      name: data[id].title, // 👈 dropdown ke liye
+      isOfferOnly: true,
+      ...data[id],
+    }));
+    setOffers(arr);
+  }
+};
   const fetchCollections = async () => {
     const res = await fetch(`${BASE_URL}/ourcollections.json`);
     const data = await res.json();
@@ -71,11 +102,25 @@ const [collectionImageFile, setCollectionImageFile] = useState(null);
     } else {
       setCollections([]);
     }
-  };
+  
 
-  useEffect(() => {
-    fetchCollections();
-  }, []);
+  };
+useEffect(() => {
+  if (collectionForm.showInOffer) {
+    setCollectionForm((prev) => ({
+      ...prev,
+      name: "",
+      imageUrl: "",
+    }));
+    setCollectionImageFile(null);
+  }
+}, [collectionForm.showInOffer]);
+
+useEffect(() => {
+  fetchCollections();
+  fetchOffers();
+}, []);
+
 
   const slugify = (text) =>
     text.trim().toLowerCase().replace(/\s+/g, "-");
@@ -84,19 +129,90 @@ const editCollection = (col) => {
   setEditingCollectionId(col.id);
   setCollectionForm({
     name: col.name,
-    imageUrl: col.imageUrl, // purani image
+    imageUrl: col.imageUrl,
   });
   setCollectionImageFile(null);
-  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  // scroll nahi, bas form visible area mein
+  collectionFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
 };
 
+
   /* ---------------- COLLECTION CRUD ---------------- */
- const handleCollectionSubmit = async (e) => {
+const handleCollectionSubmit = async (e) => {
   e.preventDefault();
 
+  /* ================= OFFER SLIDER ONLY ================= */
+  if (collectionForm.showInOffer) {
+    let offerImageUrl = collectionForm.offerImage;
+
+    if (offerImageFile) {
+      offerImageUrl = await uploadToImgBB(offerImageFile);
+    }
+
+    await fetch(`${BASE_URL}/offersliders.json`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+       type: "collection",
+  title: collectionForm.offerTitle,
+  subtitle: collectionForm.offerSubtitle,
+  bgColor: collectionForm.offerBgColor,
+  offerPercent: collectionForm.offerPercent,
+  bgImage: offerImageUrl,
+  slug: slugify(collectionForm.offerTitle),
+  products: {} // products tab add karenge jab product add ho
+      }),
+    });
+
+    alert("Offer slider added successfully ✅");
+
+    // reset
+    setCollectionForm({
+      name: "",
+      imageUrl: "",
+      showInOffer: false,
+      offerTitle: "",
+      offerSubtitle: "",
+      offerBgColor: "",
+      offerPercent: "",
+      offerImage: "",
+    });
+    setOfferImageFile(null);
+
+    fetchCollections();
+    return; // ✅ AB return sahi jagah par hai
+  }
+// Firebase path
+const sliderId = productData.collectionId || `offer-${Date.now()}`;
+const res = await fetch(`${BASE_URL}/offersliders/${sliderId}/products.json`);
+const existingProducts = await res.json() || {};
+
+// Naya product add karo
+existingProducts[productId] = {
+  id: productId,
+  name: productData.name,
+  imageUrl: productData.image || productData.gallery?.[0] || "",
+  price: productData.price,
+  offerPercent: productData.offerPercent || 0,
+  shortDescription: productData.shortDescription || ""
+};
+
+// Slider update karo
+await fetch(`${BASE_URL}/offersliders/${sliderId}.json`, {
+  method: "PATCH",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    type: "product",
+    title: productData.name,
+    slug: slugify(productData.name),
+    products: existingProducts
+  }),
+});
+
+  /* ================= NORMAL COLLECTION ================= */
   let imageUrl = collectionForm.imageUrl;
 
-  // sirf tab upload jab new image ho
   if (collectionImageFile) {
     imageUrl = await uploadToImgBB(collectionImageFile);
   }
@@ -105,6 +221,7 @@ const editCollection = (col) => {
     name: collectionForm.name,
     imageUrl,
     slug: slugify(collectionForm.name),
+    isOfferOnly: false,
     products:
       editingCollectionId
         ? collections.find((c) => c.id === editingCollectionId)?.products || {}
@@ -116,18 +233,19 @@ const editCollection = (col) => {
     : `${BASE_URL}/ourcollections.json`;
 
   await fetch(url, {
-    method: editingCollectionId ? "PUT" : "POST",
+    method: editingCollectionId ? "PATCH" : "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
   alert(editingCollectionId ? "Collection Updated" : "Collection Added");
 
-  setCollectionForm({ name: "", imageUrl: "" });
+  setCollectionForm({ name: "", imageUrl: "", showInOffer: false });
   setCollectionImageFile(null);
   setEditingCollectionId(null);
   fetchCollections();
 };
+
 
 
   const deleteCollection = async (id) => {
@@ -137,28 +255,110 @@ const editCollection = (col) => {
   };
 
   /* ---------------- PRODUCT CRUD ---------------- */
-  const handleProductSubmit = async (e) => {
-    e.preventDefault();
+const handleProductSubmit = async (e) => {
+  e.preventDefault();
 
-    if (!productData.collectionId) {
-      alert("Select collection");
-      return;
-    }
+  if (!productData.collectionId) {
+    alert("Select collection");
+    return;
+  }
 
-    const url = editingProductId
-      ? `${BASE_URL}/ourcollections/${productData.collectionId}/products/${editingProductId}.json`
-      : `${BASE_URL}/ourcollections/${productData.collectionId}/products.json`;
-
-    await fetch(url, {
-      method: editingProductId ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(productData),
-    });
-
-    alert(editingProductId ? "Product Updated" : "Product Added");
-    resetProductForm();
-    fetchCollections();
+  const productPayload = {
+    ...productData,
+    createdAt: Date.now(),
   };
+
+  const url = editingProductId
+    ? `${BASE_URL}/ourcollections/${productData.collectionId}/products/${editingProductId}.json`
+    : `${BASE_URL}/ourcollections/${productData.collectionId}/products.json`;
+
+  const res = await fetch(url, {
+    method: editingProductId ? "PUT" : "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(productPayload),
+  });
+
+  const result = await res.json();
+  const productId = editingProductId || result.name;
+// const editCollection = (col) => {
+//   setEditingCollectionId(col.id);
+//   setCollectionForm({
+//     name: col.name,
+//     imageUrl: col.imageUrl,
+
+//     showInOffer: col.showInOffer || false,
+//     offerTitle: col.offerTitle || "",
+//     offerSubtitle: col.offerSubtitle || "",
+//     offerBgColor: col.offerBgColor || "",
+//     offerPercent: col.offerPercent || "",
+//     offerImage: col.offerImage || "",
+//   });
+
+//   setCollectionImageFile(null);
+//   setOfferImageFile(null);
+// };
+
+  /* 🔥 OFFER SLIDER ENTRY (NO DATA LOSS) */
+  if (productData.showInOffer) {
+    await fetch(
+      `${BASE_URL}/offersliders/${productData.collectionId}.json`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: productData.name,
+          subtitle: productData.shortDescription || "",
+          slug: productData.name.toLowerCase().replace(/\s+/g, "-"),
+          productImage:
+            productData.image ||
+            productData.gallery?.[0] ||
+            "",
+          products: {
+            [productId]: {
+              imageUrl:
+                productData.image ||
+                productData.gallery?.[0] ||
+                "",
+            },
+          },
+        }),
+      }
+    );
+  }
+// -------- OFFER SLIDER FOR COLLECTION --------
+if (collectionForm.showInOffer) {
+  let offerImageUrl = collectionForm.offerImage;
+
+  if (offerImageFile) {
+    offerImageUrl = await uploadToImgBB(offerImageFile);
+  }
+
+await fetch(`${BASE_URL}/offersliders/${productData.collectionId}.json`, {
+  method: "PATCH",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    title: productData.name,
+    subtitle: productData.shortDescription || "",
+    offerPercent: productData.offerPercent || "",
+    productImage:
+      productData.imageUrl ||
+      productData.images?.[0] ||
+      "",
+    slug: slugify(productData.name),
+    type: "product", 
+  }),
+});
+
+
+}
+
+  alert(editingProductId ? "Product Updated" : "Product Added");
+  resetProductForm();
+  fetchCollections();
+};
+
+
+
 
   const resetProductForm = () => {
     setProductData(emptyProduct);
@@ -166,21 +366,23 @@ const editCollection = (col) => {
   };
 
   const editProduct = (colId, pid, p) => {
-    setProductData({
-      collectionId: colId,
-      ...emptyProduct,
-      ...p,
-      gallery: p.gallery?.length ? p.gallery : [""],
-      highlights: p.highlights?.length ? p.highlights : [""],
-      specs: { ...emptyProduct.specs, ...(p.specs || {}) },
-      externalStores: {
-        ...emptyProduct.externalStores,
-        ...(p.externalStores || {}),
-      },
-    });
-    setEditingProductId(pid);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  setProductData({
+    collectionId: colId,
+    ...emptyProduct,
+    ...p,
+    gallery: p.gallery?.length ? p.gallery : [""],
+    highlights: p.highlights?.length ? p.highlights : [""],
+    specs: { ...emptyProduct.specs, ...(p.specs || {}) },
+    externalStores: {
+      ...emptyProduct.externalStores,
+      ...(p.externalStores || {}),
+    },
+  });
+  setEditingProductId(pid);
+
+  // scroll nahi, bas product form visible area mein
+  productFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+};
 
   const deleteProduct = async (colId, pid) => {
     if (!window.confirm("Delete product?")) return;
@@ -231,40 +433,152 @@ const removeGalleryImage = (index) => {
       ...productData,
       externalStores: { ...productData.externalStores, [key]: val },
     });
+// const payload = collectionForm.showInOffer
+//   ? {
+//       // ONLY for offer slider collections
+//       showInOffer: true,
+//       offerTitle: collectionForm.offerTitle,
+//       offerSubtitle: collectionForm.offerSubtitle,
+//       offerBgColor: collectionForm.offerBgColor,
+//       offerPercent: collectionForm.offerPercent,
+//       offerImage: collectionForm.offerImage,
+//       slug: slugify(collectionForm.offerTitle),
+//     }
+//   : {
+//       // NORMAL COLLECTION
+//       name: collectionForm.name,
+//       imageUrl,
+//       slug: slugify(collectionForm.name),
+//       products:
+//         editingCollectionId
+//           ? collections.find((c) => c.id === editingCollectionId)?.products || {}
+//           : {},
+//     };
 
   /* ---------------- UI ---------------- */
   return (
     <div className="p-6 max-w-6xl mx-auto min-h-screen overflow-y-auto">
 
       {/* COLLECTION FORM */}
-      <div className="bg-white p-5 rounded shadow mb-6">
+      <div ref={collectionFormRef} className="bg-white p-5 rounded shadow mb-6">
         <h2 className="text-xl font-semibold mb-3">
           {editingCollectionId ? "Edit Collection" : "Add Collection"}
         </h2>
+<label className="flex items-center gap-2 mt-2">
+  <input
+    type="checkbox"
+    checked={collectionForm.showInOffer}
+    onChange={(e) =>
+      setCollectionForm({
+        ...collectionForm,
+        showInOffer: e.target.checked,
+      })
+    }
+  />
+  <span className="text-sm font-medium">
+    Show this collection in Offer Slider
+  </span>
+</label>
+{collectionForm.showInOffer && (
+  <div className="grid gap-2 border p-3 rounded bg-gray-50">
+    <input
+      className="border p-2 rounded"
+      placeholder="Offer Title"
+      value={collectionForm.offerTitle}
+      onChange={(e) =>
+        setCollectionForm({ ...collectionForm, offerTitle: e.target.value })
+      }
+    />
 
-        <form onSubmit={handleCollectionSubmit} className="grid gap-3">
-          <input
-            className="border p-2 rounded"
-            placeholder="Collection Name"
-            value={collectionForm.name}
-            onChange={(e) =>
-              setCollectionForm({ ...collectionForm, name: e.target.value })
-            }
-            required
-          />
-        <input
+    <input
+      className="border p-2 rounded"
+      placeholder="Offer Subtitle"
+      value={collectionForm.offerSubtitle}
+      onChange={(e) =>
+        setCollectionForm({
+          ...collectionForm,
+          offerSubtitle: e.target.value,
+        })
+      }
+    />
+
+    <input
+      className="border p-2 rounded"
+      placeholder="Background Color (eg: #000 or gradient)"
+      value={collectionForm.offerBgColor}
+      onChange={(e) =>
+        setCollectionForm({
+          ...collectionForm,
+          offerBgColor: e.target.value,
+        })
+      }
+    />
+
+    <input
+      type="number"
+      className="border p-2 rounded"
+      placeholder="Offer %"
+      value={collectionForm.offerPercent}
+      onChange={(e) =>
+        setCollectionForm({
+          ...collectionForm,
+          offerPercent: e.target.value,
+        })
+      }
+    />
+
+   <input
   type="file"
   accept="image/*"
-  className="border p-2 rounded"
-  onChange={(e) => setCollectionImageFile(e.target.files[0])}
+  onChange={(e) => {
+    const file = e.target.files[0];
+    setOfferImageFile(file);
+    setCollectionForm({
+      ...collectionForm,
+      offerImage: URL.createObjectURL(file), // preview
+    });
+  }}
 />
 
-{collectionForm.imageUrl && (
-  <img
-    src={collectionForm.imageUrl}
-    className="w-20 h-20 object-cover rounded border"
-  />
+
+    {collectionForm.offerImage && (
+      <img
+        src={collectionForm.offerImage}
+        className="w-24 h-16 object-cover rounded"
+      />
+    )}
+  </div>
 )}
+
+        <form onSubmit={handleCollectionSubmit} className="grid gap-3">
+    {!collectionForm.showInOffer && (
+  <>
+    <input
+      className="border p-2 rounded"
+      placeholder="Collection Name"
+      value={collectionForm.name}
+      onChange={(e) =>
+        setCollectionForm({ ...collectionForm, name: e.target.value })
+      }
+      required
+    />
+
+    <input
+      type="file"
+      accept="image/*"
+      className="border p-2 rounded"
+      onChange={(e) => setCollectionImageFile(e.target.files[0])}
+    />
+
+    {collectionForm.imageUrl && (
+      <img
+        src={collectionForm.imageUrl}
+        className="w-20 h-20 object-cover rounded border"
+      />
+    )}
+  </>
+)}
+
 
           <button className="bg-blue-600 text-white px-4 py-2 rounded w-max">
             {editingCollectionId ? "Update" : "Add"}
@@ -273,28 +587,40 @@ const removeGalleryImage = (index) => {
       </div>
 
       {/* PRODUCT FORM */}
-      <div className="bg-white p-5 rounded shadow mb-6">
+      <div ref={productFormRef} className="bg-white p-5 rounded shadow mb-6">
         <h2 className="text-xl font-semibold mb-3">
           {editingProductId ? "Edit Product" : "Add Product"}
         </h2>
 
         <form onSubmit={handleProductSubmit} className="grid gap-3">
+<select
+  className="border p-2 rounded"
+  value={productData.collectionId}
+  onChange={(e) =>
+    setProductData({ ...productData, collectionId: e.target.value })
+  }
+  required
+>
+  <option value="">Select Collection / Offer</option>
 
-          <select
-            className="border p-2 rounded"
-            value={productData.collectionId}
-            onChange={(e) =>
-              setProductData({ ...productData, collectionId: e.target.value })
-            }
-            required
-          >
-            <option value="">Select Collection</option>
-            {collections.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+  {/* NORMAL COLLECTIONS */}
+  {collections
+    .filter(c => c.name && c.name.trim() !== "")
+    .map(c => (
+      <option key={c.id} value={c.id}>
+        {c.name}
+      </option>
+    ))}
+
+  {/* OFFER SLIDERS */}
+  {offers.map(s => (
+    <option key={s.id} value={`offer-${s.id}`}>
+      🔥 {s.name} (Offer)
+    </option>
+  ))}
+</select>
+
+
 
           <input
             className="border p-2 rounded"
@@ -327,6 +653,50 @@ const removeGalleryImage = (index) => {
             }
             required
           />
+          <input
+  type="number"
+  className="border p-2 rounded"
+  placeholder="Stock Quantity"
+  value={productData.stock}
+  onChange={(e) =>
+    setProductData({ ...productData, stock: e.target.value })
+  }
+  required
+/>
+
+<label className="flex items-center gap-2">
+  <input
+    type="checkbox"
+    checked={productData.showInOffer}
+    onChange={(e) =>
+      setProductData({
+        ...productData,
+        showInOffer: e.target.checked,
+      })
+    }
+  />
+  <span className="text-sm font-medium">
+    Show this product in Offer Slider
+  </span>
+</label>
+
+{/* 🔥 EXTRA INPUT */}
+{productData.showInOffer && (
+  <input
+    type="number"
+    className="border p-2 rounded"
+    placeholder="Offer % (eg: 20)"
+    value={productData.offerPercent}
+    onChange={(e) =>
+      setProductData({
+        ...productData,
+        offerPercent: e.target.value,
+      })
+    }
+  />
+)}
+
+
 
         <input
   type="file"
@@ -485,6 +855,7 @@ const removeGalleryImage = (index) => {
       />
     )}
     <h3 className="font-semibold text-lg">{col.name}</h3>
+
   </div>
 
  <div className="flex gap-3">
@@ -505,9 +876,17 @@ const removeGalleryImage = (index) => {
 
 </div>
 
-      {col.products &&
+   {col.products &&
   Object.entries(col.products).map(([pid, p]) => {
-    const img = p.image || p.imageUrl;   // ← fallback added
+    const img = p.image || p.imageUrl;
+
+    // ✅ Calculate discounted price
+   const discountedPrice =
+  p.price && p.offerPercent
+    ? Math.round(Number(p.price) - (Number(p.price) * Number(p.offerPercent)) / 100)
+    : null;
+
+
     return (
       <div
         key={pid}
@@ -524,30 +903,193 @@ const removeGalleryImage = (index) => {
 
           <div>
             <p className="font-semibold">{p.name}</p>
-            <p className="text-sm text-gray-600">₹{p.price}</p>
+
+            {/* Original Price */}
+            <p className="text-sm text-gray-600">
+              {discountedPrice ? (
+                <span className="line-through text-gray-400 mr-2">₹{p.price}</span>
+              ) : (
+                <>₹{p.price}</>
+              )}
+            </p>
+
+            {/* Discounted Price */}
+            {discountedPrice && (
+              <p className="text-sm text-green-600 font-semibold">
+                ₹{discountedPrice} ({p.offerPercent}% OFF)
+              </p>
+            )}
+
             {p.shortDescription && (
               <p className="text-xs text-gray-500">{p.shortDescription}</p>
             )}
           </div>
         </div>
 
-        <div className="flex gap-2">
-          <button
-            className="px-3 py-1 bg-yellow-400 rounded text-xs"
-            onClick={() => editProduct(col.id, pid, p)}
-          >
-            Edit
-          </button>
-          <button
-            className="px-3 py-1 bg-red-500 text-white rounded text-xs"
-            onClick={() => deleteProduct(col.id, pid)}
-          >
-            Delete
-          </button>
+        <div className="flex flex-col gap-1 items-end">
+          {/* SHOW IN OFFER CHECKBOX */}
+      <div className="flex flex-col gap-1 items-end">
+  {/* SHOW IN OFFER CHECKBOX */}
+  <label className="flex items-center gap-1 text-xs">
+    <input
+      type="checkbox"
+      checked={p.showInOffer || false}
+      onChange={async (e) => {
+        const checked = e.target.checked;
+
+        // 1️⃣ Update local productData for UI
+        setProductData({
+          ...productData,
+          showInOffer: checked,
+          offerId: checked ? p.offerId || offers[0]?.id : null,
+          offerPercent: checked ? p.offerPercent || offers[0]?.offerPercent || 0 : 0,
+        });
+
+        const offerIdToUse = checked ? p.offerId || offers[0]?.id : p.offerId;
+
+        if (checked) {
+          // ✅ Add product to offer slider
+          if (offerIdToUse) {
+            await fetch(`${BASE_URL}/offersliders/${offerIdToUse}/products/${pid}.json`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: p.name,
+                image: p.image || p.imageUrl,
+                price: p.price,
+                offerPercent: p.offerPercent || 0,
+                collectionId: col.id,
+              }),
+            });
+          }
+
+          // ✅ Update product in collection
+          await fetch(`${BASE_URL}/ourcollections/${col.id}/products/${pid}.json`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ showInOffer: true, offerId: offerIdToUse }),
+          });
+        } else {
+          // ✅ Remove product from offer slider
+          if (offerIdToUse) {
+            await fetch(`${BASE_URL}/offersliders/${offerIdToUse}/products/${pid}.json`, {
+              method: "DELETE",
+            });
+
+            await fetch(`${BASE_URL}/ourcollections/${col.id}/products/${pid}.json`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ showInOffer: false, offerId: null, offerPercent: 0 }),
+            });
+          }
+        }
+
+        // 2️⃣ Refetch collections & offers for UI
+        fetchCollections();
+        fetchOffers();
+      }}
+    />
+    Offer
+  </label> 
+{/* OFFER DROPDOWN */}
+{p.showInOffer && (
+  <select
+    value={p.offerId || ""}
+    onChange={async (e) => {
+      const newOfferId = e.target.value;
+      const selectedOffer = offers.find((o) => o.id === newOfferId);
+
+      // ✅ Update Firebase first
+      if (p.offerId && p.offerId !== newOfferId) {
+        await fetch(`${BASE_URL}/offersliders/${p.offerId}/products/${pid}.json`, { method: "DELETE" });
+      }
+
+      if (newOfferId) {
+        await fetch(`${BASE_URL}/offersliders/${newOfferId}/products/${pid}.json`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: p.name,
+            image: p.image || p.imageUrl,
+            price: p.price,
+            offerPercent: selectedOffer?.offerPercent || 0,
+            collectionId: col.id,
+          }),
+        });
+
+        await fetch(`${BASE_URL}/ourcollections/${col.id}/products/${pid}.json`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            offerId: newOfferId,
+            offerPercent: selectedOffer?.offerPercent || 0,
+          }),
+        });
+      }
+
+      // ✅ Update collections state directly for instant UI
+      setCollections((prev) =>
+        prev.map((c) => {
+          if (c.id === col.id) {
+            return {
+              ...c,
+              products: {
+                ...c.products,
+                [pid]: {
+                  ...c.products[pid],
+                  offerId: newOfferId,
+                  offerPercent: selectedOffer?.offerPercent || 0,
+                },
+              },
+            };
+          }
+          return c;
+        })
+      );
+    }}
+  >
+    <option value="">Select Offer</option>
+    {offers.map((o) => (
+      <option key={o.id} value={o.id}>
+        🔥 {o.name} ({o.offerPercent || 0}% OFF)
+      </option>
+    ))}
+  </select>
+)}
+  {/* DISCOUNTED PRICE */}
+  {p.price && p.offerPercent ? (
+    <p className="text-sm text-green-600 font-semibold">
+      ₹{Math.round(Number(p.price) - (Number(p.price) * Number(p.offerPercent)) / 100)} (
+      {p.offerPercent}% OFF)
+    </p>
+  ) : (
+    <p className="text-sm text-gray-600">₹{p.price}</p>
+  )}
+</div>
+
+<p className="text-sm text-gray-600">
+  Stock: {p.stock || "N/A"}
+</p>
+          {/* EXISTING BUTTONS */}
+          <div className="flex gap-2 mt-1">
+            <button
+              className="px-3 py-1 bg-yellow-400 rounded text-xs"
+              onClick={() => editProduct(col.id, pid, p)}
+            >
+              Edit
+            </button>
+            <button
+              className="px-3 py-1 bg-red-500 text-white rounded text-xs"
+              onClick={() => deleteProduct(col.id, pid)}
+            >
+              Delete
+            </button>
+          </div>
         </div>
       </div>
     );
   })}
+
 
 
         </div>

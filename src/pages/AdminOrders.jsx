@@ -1,8 +1,11 @@
 // src/pages/AdminOrders.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { db } from "../firebaseConfig";
-import { ref, onValue, update, remove } from "firebase/database";
+import { ref, onValue, update, remove, set } from "firebase/database";
 import axios from "axios";
+import emailjs from "@emailjs/browser";
+import { increment } from "firebase/database";
+
 import {
   MdLocalShipping,
   MdDelete,
@@ -75,6 +78,16 @@ useEffect(() => {
     setReturnRequests(all.reverse());
   });
 }, []);
+const refundToWallet = async (uid, amount) => {
+  const wRef = ref(db, `wallets/${uid}`);
+  await update(wRef, {
+    balance: increment(amount),
+    updatedAt: Date.now(),
+  });
+};
+
+
+
 
   // -------------------------------------------------------
   // Load Cancel Requests
@@ -156,17 +169,7 @@ useEffect(() => {
   return true;
 };
 
-const handleApproveReturn = async (userId, oid) => {
-  await update(ref(db, `orders/${userId}/${oid}`), {
-    returnStatus: "Approved",
-  });
 
-  await update(ref(db, `returnRequests/${userId}/${oid}`), {
-    status: "Approved",
-  });
-
-  alert("Return Approved");
-};
 const handleRejectReturn = async (userId, oid) => {
   await update(ref(db, `orders/${userId}/${oid}`), {
     returnRequested: false,
@@ -196,6 +199,10 @@ const filteredOrders = useMemo(() => {
 if (filter === "Return Requested") {
   return o.returnStatus === "Requested";
 }
+if (filter === "Returned") {
+  return o.refundStatus === "Completed";
+}
+
 
       return o.status === filter;
     })
@@ -311,6 +318,65 @@ if (filter === "Return Requested") {
     });
     alert("Denied");
   };
+const createReturnPickup = async (order) => {
+  console.log("Return pickup created for", order.id);
+
+  await update(ref(db, `returns/${order.id}`), {
+    status: "pickup_scheduled",
+    timeline: {
+      pickupScheduledAt: Date.now(),
+    },
+  });
+
+  await update(ref(db, `orders/${order.userId}/${order.id}`), {
+    returnStatus: "Pickup Scheduled",
+  });
+};
+
+const handleApproveReturn = async (userId, orderId, order) => {
+  await set(ref(db, `returns/${orderId}`), {
+    userId,
+    orderId,
+    productName: order.items?.[0]?.name,
+    reason: order.returnReason || "Not specified",
+    status: "pickup_scheduled",
+    refundStatus: "Pending",
+    createdAt: Date.now(),
+  });
+
+  await update(ref(db, `orders/${userId}/${orderId}`), {
+    returnStatus: "Approved",
+  });
+
+  await update(ref(db, `returnRequests/${userId}/${orderId}`), {
+    status: "Approved",
+  });
+};
+
+
+const completeRefund = async (uid, oid, amount, method) => {
+
+  if (method === "Wallet") {
+    await refundToWallet(uid, amount);
+  }
+
+  await update(ref(db, `returns/${oid}`), {
+    status: "refund_processed",
+    refundAmount: amount,
+    refundMethod: method,
+    refundStatus: "Completed",
+    timeline: {
+      refundProcessedAt: Date.now(),
+    },
+  });
+
+  await update(ref(db, `orders/${uid}/${oid}`), {
+    refundAmount: amount,
+    refundMethod: method,
+    refundStatus: "Completed",
+  });
+};
+
 
   // -------------------------------------------------------
   // UI
@@ -393,66 +459,95 @@ if (filter === "Return Requested") {
       )}
 
       {/* ORDERS LIST */}
-      <div className="grid md:grid-cols-2 gap-5">
-        {filteredOrders.map((order) => (
-          <div key={order.id} className="p-5 rounded-xl shadow-md border bg-white">
-            <div className="flex justify-between items-center mb-2">
-<p className="font-semibold text-lg">#{order.orderId || order.id}</p>
-              <span className="px-3 py-1 rounded-lg text-xs font-semibold bg-gray-100">
-                {order.status}
-              </span>
-            </div>
-
-            <p className="text-sm">👤 {order.customer_name}</p>
-            <p className="text-sm">📍 {order.address}</p>
-            <p className="text-sm">
-              Total: <strong>₹{order.total}</strong>
-            </p>
-
-            <p className="mt-2 text-sm">
-              AWB:{" "}
-              <strong>{order.awbCode ? order.awbCode : "Not Generated"}</strong>
-            </p>
-
-            {order.awbCode && (
-              <a
-                href={order.trackingUrl}
-                target="_blank"
-                className="text-blue-600 underline text-sm"
-              >
-                Track Shipment
-              </a>
-            )}
-
-            {/* Buttons */}
-            <div className="flex gap-3 mt-4">
-              {!order.awbCode && order.status !== "Cancelled" && (
-                <button
-                  onClick={() => handleCreateShipment(order)}
-                  className="flex items-center gap-1 bg-blue-600 text-white px-4 py-2 rounded-lg shadow"
-                >
-                  <MdLocalShipping size={18} />
-                  {loadingId === order.id ? "..." : "Create Shipment"}
-                </button>
-              )}
-
-              <button
-                onClick={() => handlePrintLabel(order)}
-                className="flex items-center gap-1 border px-4 py-2 rounded-lg"
-              >
-                <MdPrint size={18} /> Label
-              </button>
-
-              <button
-                onClick={() => remove(ref(db, `orders/${order.userId}/${order.id}`))}
-                className="flex items-center gap-1 bg-red-600 text-white px-4 py-2 rounded-lg"
-              >
-                <MdDelete size={18} /> Delete
-              </button>
-            </div>
-          </div>
-        ))}
+   <div className="grid md:grid-cols-2 gap-5">
+  {filteredOrders.map((order) => (
+    <div
+      key={order.id}
+      className="p-5 rounded-xl shadow-md border bg-white"
+    >
+      <div className="flex justify-between items-center mb-2">
+        <p className="font-semibold text-lg">
+          #{order.orderId || order.id}
+        </p>
+        <span className="px-3 py-1 rounded-lg text-xs font-semibold bg-gray-100">
+          {order.status}
+        </span>
       </div>
+
+      <p className="text-sm">👤 {order.customer_name}</p>
+      <p className="text-sm">📍 {order.address}</p>
+      <p className="text-sm">
+        Total: <strong>₹{order.total}</strong>
+      </p>
+
+      <p className="mt-2 text-sm">
+        AWB:{" "}
+        <strong>
+          {order.awbCode ? order.awbCode : "Not Generated"}
+        </strong>
+      </p>
+
+      {order.awbCode && (
+        <a
+          href={order.trackingUrl}
+          target="_blank"
+          className="text-blue-600 underline text-sm"
+        >
+          Track Shipment
+        </a>
+      )}
+
+      {/* ACTION BUTTONS */}
+      <div className="flex gap-3 mt-4 flex-wrap">
+        {!order.awbCode && order.status !== "Cancelled" && (
+          <button
+            onClick={() => handleCreateShipment(order)}
+            className="flex items-center gap-1 bg-blue-600 text-white px-4 py-2 rounded-lg shadow"
+          >
+            <MdLocalShipping size={18} />
+            {loadingId === order.id ? "..." : "Create Shipment"}
+          </button>
+        )}
+
+        <button
+          onClick={() => handlePrintLabel(order)}
+          className="flex items-center gap-1 border px-4 py-2 rounded-lg"
+        >
+          <MdPrint size={18} /> Label
+        </button>
+
+        <button
+          onClick={() =>
+            remove(ref(db, `orders/${order.userId}/${order.id}`))
+          }
+          className="flex items-center gap-1 bg-red-600 text-white px-4 py-2 rounded-lg"
+        >
+          <MdDelete size={18} /> Delete
+        </button>
+
+        {/* ✅ REFUND BUTTON */}
+        {order.returnStatus === "Approved" &&
+          order.refundStatus !== "Completed" && (
+            <button
+              onClick={() =>
+                completeRefund(
+                  order.userId,
+                  order.id,
+                  order.total,
+                  "Wallet"
+                )
+              }
+              className="bg-green-600 text-white px-4 py-2 rounded-lg"
+            >
+              Refund to Wallet
+            </button>
+          )}
+      </div>
+    </div>
+  ))}
+</div>
+
+
 
       {/* CANCEL REQUESTS */}
       <h2 className="text-xl font-semibold mt-10 mb-3">Cancel Requests</h2>
@@ -477,6 +572,9 @@ if (filter === "Return Requested") {
               >
                 Approve
               </button>
+              <button
+  onClick={() => handleApproveReturn(userId, orderId, orders.find(o => o.id === orderId))}
+>Approve</button>
 
               <button
                 onClick={() => handleDenyCancel(userId, orderId)}
@@ -500,9 +598,13 @@ if (filter === "Return Requested") {
 
     <div className="flex gap-2">
       <button
-        onClick={() => handleApproveReturn(userId, orderId)}
-        className="bg-green-600 text-white px-3 py-1 rounded-lg"
-      >
+       onClick={() =>
+  handleApproveReturn(
+    userId,
+    orderId,
+    orders.find(o => o.id === orderId)
+  )
+}>
         Approve
       </button>
 

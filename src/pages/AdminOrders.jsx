@@ -260,7 +260,19 @@ if (filter === "Returned") {
       setLoadingId(null);
     }
   };
+const markPickedUp = async (userId, orderId) => {
+  await update(ref(db, `returns/${orderId}/timeline`), {
+    pickedUpAt: Date.now(),
+  });
+  await update(ref(db, `orders/${userId}/${orderId}`), {
+    returnStatus: "Picked Up",
+  });
 
+  alert("Item marked as picked up!");
+};
+const handleAutoRefund = async (userId, orderId, amount) => {
+  await completeRefund(userId, orderId, amount, "Wallet");
+};
   // -------------------------------------------------------
   // Single Label Print
   // -------------------------------------------------------
@@ -543,6 +555,16 @@ const completeRefund = async (uid, oid, amount, method) => {
             </button>
           )}
       </div>
+      {order.timeline && (
+  <div className="mt-2 text-xs text-gray-500">
+    {order.timeline.pickupScheduledAt && (
+      <p>Pickup: {new Date(order.timeline.pickupScheduledAt).toLocaleString()}</p>
+    )}
+    {order.timeline.refundProcessedAt && (
+      <p>Refund: {new Date(order.timeline.refundProcessedAt).toLocaleString()}</p>
+    )}
+  </div>
+)}
     </div>
   ))}
 </div>
@@ -572,9 +594,7 @@ const completeRefund = async (uid, oid, amount, method) => {
               >
                 Approve
               </button>
-              <button
-  onClick={() => handleApproveReturn(userId, orderId, orders.find(o => o.id === orderId))}
->Approve</button>
+         
 
               <button
                 onClick={() => handleDenyCancel(userId, orderId)}
@@ -587,36 +607,79 @@ const completeRefund = async (uid, oid, amount, method) => {
         ))}
       </div>
 
-      <h2 className="text-xl font-semibold mt-10 mb-3">Return Requests</h2>
+     {/* RETURN REQUESTS */}
+<h2 className="text-xl font-semibold mt-10 mb-3">Return Requests</h2>
 
-{returnRequests.map(({ userId, orderId, req }) => (
-  <div key={orderId} className="p-4 border bg-white rounded-lg shadow flex justify-between">
-    <div>
-      <p className="font-semibold">Order: {orderId}</p>
-      <p className="text-sm text-gray-600">Reason: {req.reason}</p>
-    </div>
+<div className="space-y-3">
+  {returnRequests.length === 0 && <p>No return requests.</p>}
 
-    <div className="flex gap-2">
-      <button
-       onClick={() =>
-  handleApproveReturn(
-    userId,
-    orderId,
-    orders.find(o => o.id === orderId)
-  )
-}>
-        Approve
-      </button>
+  {returnRequests.map(({ userId, orderId, req }) => {
+    const order = orders.find(o => o.id === orderId);
 
-      <button
-        onClick={() => handleRejectReturn(userId, orderId)}
-        className="border px-3 py-1 rounded-lg"
+    return (
+      <div
+        key={orderId}
+        className="p-4 border bg-white rounded-lg shadow flex justify-between items-center"
       >
-        Reject
-      </button>
-    </div>
-  </div>
-))}
+        <div>
+          <p className="font-semibold">Order: {orderId}</p>
+          <p className="text-sm text-gray-600">Reason: {req.reason}</p>
+        </div>
+
+        <div className="flex gap-2 flex-wrap">
+          {/* Approve Return */}
+          {req.status !== "pickup_scheduled" && (
+            <button
+              onClick={() => handleApproveReturn(userId, orderId, order)}
+              className="bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700"
+            >
+              Approve
+            </button>
+          )}
+          
+
+          {/* Reject Return */}
+          <button
+            onClick={() => handleRejectReturn(userId, orderId)}
+            className="border px-3 py-1 rounded-lg hover:bg-gray-100"
+          >
+            Reject
+          </button>
+
+          {/* Schedule Pickup */}
+          {req.status !== "pickup_scheduled" && order && (
+            <button
+              onClick={() => createReturnPickup(order)}
+              className="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700"
+            >
+              Schedule Pickup
+            </button>
+          )}
+
+          {/* Pickup Scheduled Label */}
+          {req.status === "pickup_scheduled" && (
+            <span className="px-3 py-1 bg-gray-200 rounded-lg text-gray-600 text-sm">
+              Pickup Scheduled
+            </span>
+          )}
+
+          {/* Refund */}
+          {order?.returnStatus === "Approved" && order?.refundStatus !== "Completed" && (
+            <button
+              onClick={() =>
+                completeRefund(userId, orderId, order.total, "Wallet")
+              }
+              className="bg-green-600 text-white px-4 py-1 rounded-lg hover:bg-green-700"
+            >
+              Refund to Wallet
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  })}
+</div>
+
 
     </div>
   );
